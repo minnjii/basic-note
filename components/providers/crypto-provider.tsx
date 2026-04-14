@@ -68,14 +68,21 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
       return;
     }
     // settings === undefined → no local settings, try remote
-    syncPullSettings().then(async (remote) => {
-      if (remote) {
-        await db.settings.put(remote);
-        // liveQuery will re-trigger and pick up the new settings
-      }
-      setIsLoading(false);
-    });
+    syncPullSettings()
+      .then(async (remote) => {
+        if (remote) {
+          await db.settings.put(remote);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
   }, [settings]);
+
+  // Safety timeout: force loading off if stuck (e.g. IndexedDB blocked)
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 5000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // ── Idle auto-lock ──────────────────────────────────────────
   const resetIdleTimer = useCallback(() => {

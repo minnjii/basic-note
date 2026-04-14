@@ -55,7 +55,7 @@ export function AppSidebar() {
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold tracking-tight">
-                    SecureNote
+                    just note
                   </span>
                   <span className="truncate text-xs text-muted-foreground">
                     개인 보안 노트

@@ -1,6 +1,6 @@
 # 🕒 Project Checkpoint (2026-04-14)
 
-- **Current Milestone**: Phase 5 완료 + Vercel 배포 완료 + 카테고리 이동 기능 추가
+- **Current Milestone**: Phase 6 PWA 완료
 
 - **Key Achievements**:
   - Phase 1: 기반 구축 (패키지 설치, 타입/DB/상수 정의, Provider, 앱 셸+사이드바+라우팅)
@@ -12,10 +12,9 @@
   - 카테고리 이동: 노트 리스트 아이템에 폴더 아이콘 드롭다운, 노트 상세 드롭다운 서브메뉴
   - 노트 생성일: 상세 타이틀 우측에 날짜 표시, 클릭 시 캘린더 팝오버로 날짜 변경 가능
   - 캘린더 뷰: createdAt 기준 노트 그룹핑, 선택 날짜 검정 점 표시
-  - 버그 수정: useLiveQuery null/undefined 구분, IndexedDB null 인덱싱, 슬래시 명령 "/" 충돌, 블릿 Enter debounce 문제
+  - **Phase 6 (PWA)**: manifest.json, Service Worker(network-first navigation + cache-first static), 아이콘(192/512/apple-touch), SW 등록 컴포넌트, 앱 이름 "just note"로 통일
 
 - **Pending Tasks**:
-  - Phase 6: PWA/오프라인 (Service Worker, manifest.json)
   - Phase 7: 설정 페이지, 내보내기/가져오기, 토스트 알림, 키보드 단축키, 모바일 대응
   - 캘린더 점 표시: 선택 상태에서 z-index 이슈 잔존 가능 (브라우저 확인 필요)
 
@@ -28,6 +27,9 @@
   - 배포: Vercel (서버리스, 도쿄 엣지), GitHub 자동 연동은 미설정 (수동 vercel --prod)
   - 뷰 전환: 라우트 기반 (/notes, /notes/calendar, /notes/categories) + 헤더 탭 네비게이션
   - 노트 날짜: createdAt을 사용자가 변경 가능 (updateNoteDate 훅)
+  - PWA: 수동 Service Worker (next-pwa 미사용), network-first navigation + cache-first static assets
+  - DB 이름: "SecureNotes" 유지 (기존 데이터 호환)
+  - 앱 이름: "just note"
 
 - **Agent Notes**:
   - Supabase URL: https://yjguaevkaymidxvllioo.supabase.co
@@ -44,11 +46,11 @@
 ## 파일 구조 요약
 ```
 app/
-  layout.tsx, page.tsx (→ /notes 리다이렉트)
+  layout.tsx (PWA 메타태그+SW등록 추가), page.tsx (→ /notes 리다이렉트)
   notes/ (layout.tsx[뷰탭] + page.tsx + [noteId]/page.tsx[날짜표시+카테고리이동] + calendar/page.tsx + categories/page.tsx + categories/[categoryId]/page.tsx)
   settings/ (layout.tsx + page.tsx)
 components/
-  providers/ (db-provider, crypto-provider, auth-gate)
+  providers/ (db-provider, crypto-provider, auth-gate, sw-register[NEW])
   sidebar/ (app-sidebar, category-tree)
   notes/ (note-list[카테고리props전달], note-list-item[카테고리이동드롭다운])
   editor/ (block-editor, block-renderer, block-types, note-title, slash-command-menu, blocks/*)
@@ -56,4 +58,7 @@ components/
   lock-screen.tsx
 hooks/ (use-notes[updateNoteDate추가], use-blocks, use-categories)
 lib/ (db, types, constants, crypto, fractional-index, supabase, sync/engine)
+public/
+  manifest.json[NEW], sw.js[NEW]
+  icons/ (icon.svg, icon-192.png, icon-512.png, apple-touch-icon.png)[NEW]
 ```
