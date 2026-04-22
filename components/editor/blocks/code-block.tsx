@@ -13,6 +13,11 @@ export function CodeBlock({
   isFocused,
 }: BlockComponentProps) {
   const ref = useRef<HTMLPreElement>(null);
+  const contentRef = useRef(content);
+
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
 
   useEffect(() => {
     registerRef(ref.current);
@@ -51,6 +56,12 @@ export function CodeBlock({
     [onKeyDown]
   );
 
+  const handleBlur = useCallback(() => {
+    if (ref.current && ref.current.textContent !== contentRef.current) {
+      ref.current.textContent = contentRef.current;
+    }
+  }, []);
+
   return (
     <div style={{ paddingLeft: `${indent * 1.5}rem` }}>
       <pre
@@ -61,6 +72,7 @@ export function CodeBlock({
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         onFocus={onFocus}
+        onBlur={handleBlur}
         data-placeholder="코드를 입력하세요"
       />
     </div>

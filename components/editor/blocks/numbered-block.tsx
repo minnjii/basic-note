@@ -18,6 +18,11 @@ export function NumberedBlock({
   isFocused,
 }: NumberedBlockProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const contentRef = useRef(content);
+
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
 
   useEffect(() => {
     registerRef(ref.current);
@@ -43,6 +48,12 @@ export function NumberedBlock({
     }
   }, [onContentChange]);
 
+  const handleBlur = useCallback(() => {
+    if (ref.current && ref.current.textContent !== contentRef.current) {
+      ref.current.textContent = contentRef.current;
+    }
+  }, []);
+
   return (
     <div
       className="flex items-start gap-2"
@@ -59,6 +70,7 @@ export function NumberedBlock({
         onInput={handleInput}
         onKeyDown={onKeyDown}
         onFocus={onFocus}
+        onBlur={handleBlur}
         data-placeholder="리스트 항목"
       />
     </div>

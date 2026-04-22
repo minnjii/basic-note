@@ -20,7 +20,12 @@ export function HeadingBlock({
   isFocused,
 }: BlockComponentProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const contentRef = useRef(content);
   const level = (meta.level ?? 1) as 1 | 2 | 3;
+
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
 
   useEffect(() => {
     registerRef(ref.current);
@@ -46,6 +51,12 @@ export function HeadingBlock({
     }
   }, [onContentChange]);
 
+  const handleBlur = useCallback(() => {
+    if (ref.current && ref.current.textContent !== contentRef.current) {
+      ref.current.textContent = contentRef.current;
+    }
+  }, []);
+
   return (
     <div
       ref={ref}
@@ -56,6 +67,7 @@ export function HeadingBlock({
       onInput={handleInput}
       onKeyDown={onKeyDown}
       onFocus={onFocus}
+      onBlur={handleBlur}
       data-placeholder={`제목 ${level}`}
     />
   );

@@ -15,7 +15,12 @@ export function BulletBlock({
   isFocused,
 }: BlockComponentProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const contentRef = useRef(content);
   const marker = BULLET_MARKERS[Math.min(indent, BULLET_MARKERS.length - 1)];
+
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
 
   useEffect(() => {
     registerRef(ref.current);
@@ -41,6 +46,12 @@ export function BulletBlock({
     }
   }, [onContentChange]);
 
+  const handleBlur = useCallback(() => {
+    if (ref.current && ref.current.textContent !== contentRef.current) {
+      ref.current.textContent = contentRef.current;
+    }
+  }, []);
+
   return (
     <div
       className="flex items-start gap-2"
@@ -57,6 +68,7 @@ export function BulletBlock({
         onInput={handleInput}
         onKeyDown={onKeyDown}
         onFocus={onFocus}
+        onBlur={handleBlur}
         data-placeholder="리스트 항목"
       />
     </div>

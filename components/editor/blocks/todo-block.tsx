@@ -16,7 +16,12 @@ export function TodoBlock({
   isFocused,
 }: BlockComponentProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const contentRef = useRef(content);
   const checked = meta.checked ?? false;
+
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
 
   useEffect(() => {
     registerRef(ref.current);
@@ -42,6 +47,12 @@ export function TodoBlock({
     }
   }, [onContentChange]);
 
+  const handleBlur = useCallback(() => {
+    if (ref.current && ref.current.textContent !== contentRef.current) {
+      ref.current.textContent = contentRef.current;
+    }
+  }, []);
+
   return (
     <div
       className="flex items-start gap-2.5"
@@ -64,6 +75,7 @@ export function TodoBlock({
         onInput={handleInput}
         onKeyDown={onKeyDown}
         onFocus={onFocus}
+        onBlur={handleBlur}
         data-placeholder="할 일"
       />
     </div>

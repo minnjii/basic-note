@@ -13,6 +13,11 @@ export function TextBlock({
   isFocused,
 }: BlockComponentProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const contentRef = useRef(content);
+
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
 
   useEffect(() => {
     registerRef(ref.current);
@@ -39,6 +44,15 @@ export function TextBlock({
     }
   }, [onContentChange]);
 
+  const handleBlur = useCallback(() => {
+    // DOM may diverge from `content` when a key handler called updateBlock
+    // while the element was focused (Enter split, Backspace merge, etc.).
+    // Sync on actual blur so the next render doesn't show stale content.
+    if (ref.current && ref.current.textContent !== contentRef.current) {
+      ref.current.textContent = contentRef.current;
+    }
+  }, []);
+
   return (
     <div
       ref={ref}
@@ -49,6 +63,7 @@ export function TextBlock({
       onInput={handleInput}
       onKeyDown={onKeyDown}
       onFocus={onFocus}
+      onBlur={handleBlur}
     />
   );
 }

@@ -13,6 +13,11 @@ export function QuoteBlock({
   isFocused,
 }: BlockComponentProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const contentRef = useRef(content);
+
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
 
   useEffect(() => {
     registerRef(ref.current);
@@ -38,6 +43,12 @@ export function QuoteBlock({
     }
   }, [onContentChange]);
 
+  const handleBlur = useCallback(() => {
+    if (ref.current && ref.current.textContent !== contentRef.current) {
+      ref.current.textContent = contentRef.current;
+    }
+  }, []);
+
   return (
     <div
       className="flex items-stretch"
@@ -52,6 +63,7 @@ export function QuoteBlock({
         onInput={handleInput}
         onKeyDown={onKeyDown}
         onFocus={onFocus}
+        onBlur={handleBlur}
         data-placeholder="인용문"
       />
     </div>
