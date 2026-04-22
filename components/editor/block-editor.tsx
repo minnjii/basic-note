@@ -313,8 +313,10 @@ export function BlockEditor({ noteId }: BlockEditorProps) {
         return;
       }
 
-      // Backspace at caret position 0 of a non-empty block → merge this
-      // block's content into the previous block and focus at the join point.
+      // Backspace at caret position 0 of a non-empty block → move caret to
+      // the end of the previous block. No merge, no delete — just navigate.
+      // Subsequent backspaces then delete chars from the previous block
+      // naturally via native contentEditable behavior.
       if (e.key === "Backspace" && index > 0 && liveContent !== "") {
         if (e.nativeEvent.isComposing || e.keyCode === 229) return;
         const sel = window.getSelection();
@@ -322,45 +324,7 @@ export function BlockEditor({ noteId }: BlockEditorProps) {
         const caret = el ? getCaretOffset(el) : -1;
         if (caret === 0 && collapsed) {
           e.preventDefault();
-          const prev = blocks[index - 1];
-          if (!prev) return;
-          const prevEl = blockRefs.current.get(index - 1);
-          const prevContent = prevEl?.textContent ?? prev.decryptedContent;
-          const joinPos = prevContent.length;
-          const merged = prevContent + liveContent;
-
-          // Cancel pending debounced saves on both blocks.
-          for (const bid of [block.id, prev.id]) {
-            const pending = saveTimers.current.get(bid);
-            if (pending) {
-              clearTimeout(pending);
-              saveTimers.current.delete(bid);
-            }
-          }
-
-          updateBlock(prev.id, { content: merged });
-          deleteBlock(block.id);
-
-          setFocusedIndex(index - 1);
-          requestAnimationFrame(() => {
-            const target = blockRefs.current.get(index - 1);
-            if (!target) return;
-            target.focus();
-            if (target.textContent !== merged) {
-              target.textContent = merged;
-            }
-            const textNode = target.firstChild;
-            if (!textNode) return;
-            try {
-              const range = document.createRange();
-              const sel2 = window.getSelection();
-              const maxLen = textNode.textContent?.length ?? 0;
-              range.setStart(textNode, Math.min(joinPos, maxLen));
-              range.collapse(true);
-              sel2?.removeAllRanges();
-              sel2?.addRange(range);
-            } catch {}
-          });
+          focusBlock(index - 1, true);
           return;
         }
       }
