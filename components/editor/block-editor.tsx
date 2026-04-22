@@ -91,7 +91,10 @@ function SortableBlock({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    // Only apply dnd-kit's transition while dragging. Otherwise any parent
+    // re-render / reflow can trigger a visible repaint of the text as the
+    // transition property is evaluated on every layout change.
+    transition: isDragging ? transition : undefined,
     opacity: isDragging ? 0.5 : 1,
   };
 
