@@ -90,10 +90,21 @@ export function useBlocks(noteId: string) {
     });
   }, [rawBlocks]);
 
+  // Preserve per-block object identity across re-decrypt passes so React /
+  // dnd-kit / block components don't see phantom reference churn. Every Dexie
+  // write currently produces a fresh rawBlocks array; without this cache,
+  // every block got a new object reference on every Enter, causing 7+ blocks
+  // above to flicker from downstream re-renders.
+  const prevDecryptedRef = useRef<DecryptedBlock[]>([]);
+
   const decryptedReal = useLiveQuery(
     async () => {
-      if (!isUnlocked || !rawBlocks || rawBlocks.length === 0) return [];
+      if (!isUnlocked || !rawBlocks || rawBlocks.length === 0) {
+        prevDecryptedRef.current = [];
+        return [];
+      }
       const cache = decryptCacheRef.current;
+      const prevById = new Map(prevDecryptedRef.current.map((b) => [b.id, b]));
       const decrypted = await Promise.all(
         rawBlocks.map(async (block) => {
           let decryptedContent = "";
@@ -115,9 +126,24 @@ export function useBlocks(noteId: string) {
             // instead of poisoning React state with a sticky fail label.
             decryptedContent = isLockError(e) ? "" : tr("lock.decryptFail");
           }
+          // Reuse prior reference when the block is effectively unchanged.
+          const prev = prevById.get(block.id);
+          if (
+            prev &&
+            prev.updatedAt === block.updatedAt &&
+            prev.deletedAt === block.deletedAt &&
+            prev.content === block.content &&
+            prev.sortOrder === block.sortOrder &&
+            prev.type === block.type &&
+            prev.indent === block.indent &&
+            prev.decryptedContent === decryptedContent
+          ) {
+            return prev;
+          }
           return { ...block, decryptedContent } as DecryptedBlock;
         })
       );
+      prevDecryptedRef.current = decrypted;
       return decrypted;
     },
     [rawBlocks, isUnlocked],

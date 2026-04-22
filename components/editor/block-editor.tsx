@@ -165,6 +165,10 @@ export function BlockEditor({ noteId }: BlockEditorProps) {
     return counters;
   }, [blocks]);
 
+  // Stable `items` array for SortableContext so dnd-kit doesn't re-register
+  // every useSortable child on every parent render.
+  const sortableItems = useMemo(() => blocks.map((b) => b.id), [blocks]);
+
   const registerRef = useCallback(
     (index: number, el: HTMLElement | null) => {
       if (el) {
@@ -564,7 +568,7 @@ export function BlockEditor({ noteId }: BlockEditorProps) {
         onDragEnd={handleDragEnd}
       >
         <SortableContext
-          items={blocks.map((b) => b.id)}
+          items={sortableItems}
           strategy={verticalListSortingStrategy}
         >
           <div
