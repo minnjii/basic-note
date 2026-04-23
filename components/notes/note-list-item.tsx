@@ -103,7 +103,7 @@ export function NoteListItem({
           </span>
         </div>
         {hasMenu && (
-          <CardAction className="self-center">
+          <CardAction className="self-center ml-[5px]">
             <div className="flex items-center">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
