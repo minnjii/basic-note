@@ -73,6 +73,9 @@ export function NoteListItem({
   const stop = (e: React.MouseEvent) => e.stopPropagation();
 
   const hasMenu = onTogglePin || onMoveToCategory || onDelete;
+  const folderName = note.categoryId
+    ? categories?.find((c) => c.id === note.categoryId)?.name ?? t("editor.uncategorized")
+    : t("editor.uncategorized");
 
   return (
     <Card
@@ -93,9 +96,10 @@ export function NoteListItem({
         </CardDescription>
         <CardAction>
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground shrink-0">
-              {format(note.createdAt, "yyyy.MM.dd")}
-            </span>
+            <div className="flex flex-col items-end gap-0.5 text-xs text-muted-foreground">
+              <span className="shrink-0 max-w-[140px] truncate">{folderName}</span>
+              <span className="shrink-0">{format(note.createdAt, "yyyy.MM.dd")}</span>
+            </div>
             {hasMenu && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
