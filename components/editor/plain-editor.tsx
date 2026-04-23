@@ -15,88 +15,63 @@ import { looksLikeCiphertext } from "@/lib/crypto";
 import { isLockError } from "@/lib/decrypt-diagnostics";
 
 /**
- * Apple Notes-style plain editor.
- * Single contentEditable, smart bullet continuation on Enter, Tab for indent.
- * Storage: one encrypted plaintext string per note (note.content).
+ * Apple Notes-style editor. Single HTML contentEditable with inline format
+ * (bold / italic / underline / strikethrough), heading sizes, and lists.
+ * Storage: encrypted HTML string per note (note.content).
  */
-
-const BULLET = "• ";
 
 interface PlainEditorProps {
   noteId: string;
 }
 
 export interface PlainEditorHandle {
-  /** Toggle bullet (•) marker on the line where the caret currently sits. */
+  execBold: () => void;
+  execItalic: () => void;
+  execUnderline: () => void;
+  execStrikethrough: () => void;
+  /** Set block element type for current line. null → body paragraph (div). */
+  setHeading: (level: 1 | 2 | 3 | null) => void;
   toggleBulletAtCaret: () => void;
+  toggleNumberedAtCaret: () => void;
 }
 
-// Read caret offset (as string index) within an element that only contains
-// plaintext (we use contentEditable=plaintext-only to guarantee this).
-function getCaretOffset(el: HTMLElement): number {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return 0;
-  const range = sel.getRangeAt(0);
-  if (!el.contains(range.endContainer)) return 0;
-  const pre = range.cloneRange();
-  pre.selectNodeContents(el);
-  pre.setEnd(range.endContainer, range.endOffset);
-  return pre.toString().length;
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
-function setCaretToOffset(el: HTMLElement, offset: number) {
-  const selection = window.getSelection();
-  if (!selection) return;
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-  let remaining = offset;
-  let node: Node | null = walker.nextNode();
-  if (!node) {
-    // Empty element — place caret inside
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(range);
-    return;
-  }
-  while (node) {
-    const len = node.textContent?.length ?? 0;
-    if (remaining <= len) {
-      const range = document.createRange();
-      range.setStart(node, remaining);
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      return;
+/** Convert legacy plaintext (with optional "• " bullet prefixes) to HTML. */
+function plaintextToHtml(text: string): string {
+  if (!text) return "";
+  const lines = text.split("\n");
+  const parts: string[] = [];
+  let inList = false;
+  const flushList = () => {
+    if (inList) {
+      parts.push("</ul>");
+      inList = false;
     }
-    remaining -= len;
-    node = walker.nextNode();
+  };
+  for (const line of lines) {
+    const bulletMatch = line.match(/^ *• (.*)$/);
+    if (bulletMatch) {
+      if (!inList) {
+        parts.push("<ul>");
+        inList = true;
+      }
+      parts.push(`<li>${escapeHtml(bulletMatch[1])}</li>`);
+    } else {
+      flushList();
+      parts.push(`<div>${line ? escapeHtml(line) : "<br>"}</div>`);
+    }
   }
-  // Fallback: end of element
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  range.collapse(false);
-  selection.removeAllRanges();
-  selection.addRange(range);
+  flushList();
+  return parts.join("");
 }
 
-interface LineInfo {
-  lineStart: number;
-  lineEnd: number;
-  line: string;
-  bulletIndent: number | null; // leading spaces count if line is "  • ...", else null
-}
-
-function getLineInfo(text: string, offset: number): LineInfo {
-  const lineStart = text.lastIndexOf("\n", offset - 1) + 1;
-  const nextNl = text.indexOf("\n", offset);
-  const lineEnd = nextNl === -1 ? text.length : nextNl;
-  const line = text.slice(lineStart, lineEnd);
-  const match = line.match(/^( *)• /);
-  const bulletIndent = match ? match[1].length : null;
-  return { lineStart, lineEnd, line, bulletIndent };
-}
-
+/** Rehydrate from old block-based model if present. */
 async function migrateFromBlocks(
   noteId: string,
   decrypt: (s: string) => Promise<string>
@@ -106,7 +81,14 @@ async function migrateFromBlocks(
     .between([noteId, ""], [noteId, "\uffff"])
     .toArray();
   const active = blocks.filter((b) => !b.deletedAt);
-  const lines: string[] = [];
+  const parts: string[] = [];
+  let inList = false;
+  const flushList = () => {
+    if (inList) {
+      parts.push("</ul>");
+      inList = false;
+    }
+  };
   for (const block of active) {
     let text = "";
     if (block.content) {
@@ -117,47 +99,54 @@ async function migrateFromBlocks(
         text = "";
       }
     }
-    const indent = Math.max(0, block.indent || 0);
-    const prefix = " ".repeat(indent * 2);
+    const esc = escapeHtml(text);
     switch (block.type) {
       case "bullet":
       case "todo":
       case "numbered":
-        lines.push(prefix + BULLET + text);
+        if (!inList) {
+          parts.push("<ul>");
+          inList = true;
+        }
+        parts.push(`<li>${esc || "<br>"}</li>`);
         break;
-      case "heading":
-        lines.push(text);
+      case "heading": {
+        flushList();
+        const level = block.meta?.level ?? 1;
+        parts.push(`<h${level}>${esc}</h${level}>`);
         break;
+      }
       case "divider":
-        lines.push("—");
+        flushList();
+        parts.push("<hr>");
         break;
-      case "quote":
-      case "code":
       case "text":
       default:
-        lines.push(prefix + text);
+        flushList();
+        parts.push(`<div>${esc || "<br>"}</div>`);
         break;
     }
   }
-  return lines.join("\n");
+  flushList();
+  return parts.join("");
 }
 
 export const PlainEditor = forwardRef<PlainEditorHandle, PlainEditorProps>(
   function PlainEditor({ noteId }, forwardedRef) {
-  const { encryptText, decryptText, isUnlocked } = useCrypto();
-  const note = useLiveQuery(() => db.notes.get(noteId), [noteId]);
-  const ref = useRef<HTMLDivElement>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const loadedForRef = useRef<string | null>(null);
-  const latestTextRef = useRef<string>("");
+    const { encryptText, decryptText, isUnlocked } = useCrypto();
+    const note = useLiveQuery(() => db.notes.get(noteId), [noteId]);
+    const ref = useRef<HTMLDivElement>(null);
+    const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const loadedForRef = useRef<string | null>(null);
 
-  const saveSoon = useCallback(
-    (text: string) => {
-      latestTextRef.current = text;
+    const saveSoon = useCallback(() => {
+      const el = ref.current;
+      if (!el) return;
+      const html = el.innerHTML;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(async () => {
         try {
-          const encrypted = await encryptText(text);
+          const encrypted = await encryptText(html);
           await db.notes.update(noteId, {
             content: encrypted,
             updatedAt: Date.now(),
@@ -168,238 +157,131 @@ export const PlainEditor = forwardRef<PlainEditorHandle, PlainEditorProps>(
           console.error("[PlainEditor] save failed:", e);
         }
       }, 400);
-    },
-    [encryptText, noteId]
-  );
+    }, [encryptText, noteId]);
 
-  // Load / migrate when note or unlock state changes.
-  useEffect(() => {
-    if (!isUnlocked || !note || !ref.current) return;
-    if (loadedForRef.current === noteId) return;
-    loadedForRef.current = noteId;
+    // Load / migrate when note or unlock state changes.
+    useEffect(() => {
+      if (!isUnlocked || !note || !ref.current) return;
+      if (loadedForRef.current === noteId) return;
+      loadedForRef.current = noteId;
 
-    let cancelled = false;
-    (async () => {
-      let plaintext = "";
-      if (note.content) {
-        try {
-          const decrypted = await decryptText(note.content);
-          plaintext = looksLikeCiphertext(decrypted) ? "" : decrypted;
-        } catch (e) {
-          if (!isLockError(e)) {
-            plaintext = "";
-          }
-        }
-      } else {
-        // Migrate from the old block-based model.
-        plaintext = await migrateFromBlocks(noteId, decryptText);
-        if (plaintext) {
+      let cancelled = false;
+      (async () => {
+        let html = "";
+        if (note.content) {
           try {
-            const encrypted = await encryptText(plaintext);
-            await db.notes.update(noteId, {
-              content: encrypted,
-              updatedAt: Date.now(),
-            });
-            const updated = await db.notes.get(noteId);
-            if (updated) syncPushEntity("note", updated);
-          } catch {}
-        }
-      }
-      if (cancelled || !ref.current) return;
-      if (ref.current.textContent !== plaintext) {
-        ref.current.textContent = plaintext;
-      }
-      latestTextRef.current = plaintext;
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [noteId, isUnlocked, note, decryptText, encryptText]);
-
-  // Flush pending save when unmounting or switching notes.
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = null;
-      }
-    };
-  }, [noteId]);
-
-  const handleInput = useCallback(() => {
-    if (!ref.current) return;
-    const text = ref.current.textContent ?? "";
-    saveSoon(text);
-  }, [saveSoon]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
-      const el = ref.current;
-      if (!el) return;
-      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
-
-      if (e.key === "Enter" && !e.shiftKey) {
-        const offset = getCaretOffset(el);
-        const text = el.textContent ?? "";
-        const { lineStart, line, bulletIndent } = getLineInfo(text, offset);
-
-        if (bulletIndent !== null) {
-          const bulletEnd = lineStart + bulletIndent + BULLET.length;
-          const caretOnEmptyBullet =
-            offset === bulletEnd && line.length === bulletIndent + BULLET.length;
-
-          if (caretOnEmptyBullet) {
-            // Empty bullet → exit bullet mode (clear this line's marker).
-            e.preventDefault();
-            const newText = text.slice(0, lineStart) + text.slice(lineStart + line.length);
-            el.textContent = newText;
-            setCaretToOffset(el, lineStart);
-            saveSoon(newText);
-            return;
-          }
-
-          e.preventDefault();
-          const indent = " ".repeat(bulletIndent);
-          const insert = `\n${indent}${BULLET}`;
-          const newText = text.slice(0, offset) + insert + text.slice(offset);
-          el.textContent = newText;
-          setCaretToOffset(el, offset + insert.length);
-          saveSoon(newText);
-          return;
-        }
-        // Non-bullet line — browser default line break is fine (plaintext-only).
-      }
-
-      if (e.key === "Tab") {
-        const offset = getCaretOffset(el);
-        const text = el.textContent ?? "";
-        const { lineStart, bulletIndent } = getLineInfo(text, offset);
-        if (bulletIndent !== null) {
-          e.preventDefault();
-          if (e.shiftKey) {
-            if (bulletIndent >= 2) {
-              const newText = text.slice(0, lineStart) + text.slice(lineStart + 2);
-              el.textContent = newText;
-              setCaretToOffset(el, Math.max(lineStart, offset - 2));
-              saveSoon(newText);
+            const decrypted = await decryptText(note.content);
+            if (!looksLikeCiphertext(decrypted)) {
+              html = /<[a-z][^>]*>/i.test(decrypted)
+                ? decrypted
+                : plaintextToHtml(decrypted);
             }
-          } else {
-            const newText = text.slice(0, lineStart) + "  " + text.slice(lineStart);
-            el.textContent = newText;
-            setCaretToOffset(el, offset + 2);
-            saveSoon(newText);
+          } catch (e) {
+            if (!isLockError(e)) html = "";
           }
-          return;
-        }
-        // Plain line Tab: insert 2 spaces (simple indent).
-        e.preventDefault();
-        const newText = text.slice(0, offset) + "  " + text.slice(offset);
-        el.textContent = newText;
-        setCaretToOffset(el, offset + 2);
-        saveSoon(newText);
-      }
-
-      // Auto-bullet: typing "- " or "* " at the start of a line (only indent
-      // before) converts to "• ".
-      if (e.key === " " && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const offset = getCaretOffset(el);
-        const text = el.textContent ?? "";
-        const { lineStart, line } = getLineInfo(text, offset);
-        const before = line.slice(0, offset - lineStart);
-        const match = before.match(/^( *)[-*]$/);
-        if (match) {
-          e.preventDefault();
-          const indent = match[1];
-          const newText =
-            text.slice(0, lineStart) +
-            indent +
-            BULLET +
-            text.slice(offset);
-          el.textContent = newText;
-          setCaretToOffset(el, lineStart + indent.length + BULLET.length);
-          saveSoon(newText);
-          return;
-        }
-      }
-
-      if (e.key === "Backspace") {
-        const offset = getCaretOffset(el);
-        const text = el.textContent ?? "";
-        const { lineStart, bulletIndent } = getLineInfo(text, offset);
-        if (bulletIndent !== null) {
-          const bulletEnd = lineStart + bulletIndent + BULLET.length;
-          // Caret right after the bullet marker → remove the marker.
-          if (offset === bulletEnd) {
-            const sel = window.getSelection();
-            if (!sel?.isCollapsed) return;
-            e.preventDefault();
-            const newText =
-              text.slice(0, lineStart) +
-              text.slice(lineStart).replace(/^( *)• /, "$1");
-            el.textContent = newText;
-            setCaretToOffset(el, offset - BULLET.length);
-            saveSoon(newText);
-            return;
+        } else {
+          html = await migrateFromBlocks(noteId, decryptText);
+          if (html) {
+            try {
+              const encrypted = await encryptText(html);
+              await db.notes.update(noteId, {
+                content: encrypted,
+                updatedAt: Date.now(),
+              });
+              const updated = await db.notes.get(noteId);
+              if (updated) syncPushEntity("note", updated);
+            } catch {}
           }
         }
-      }
-    },
-    [saveSoon]
-  );
+        if (cancelled || !ref.current) return;
+        if (ref.current.innerHTML !== html) {
+          ref.current.innerHTML = html;
+        }
+      })();
 
-  useImperativeHandle(
-    forwardedRef,
-    () => ({
-      toggleBulletAtCaret: () => {
+      return () => {
+        cancelled = true;
+      };
+    }, [noteId, isUnlocked, note, decryptText, encryptText]);
+
+    // Flush pending save when note changes / unmount.
+    useEffect(() => {
+      return () => {
+        if (saveTimerRef.current) {
+          clearTimeout(saveTimerRef.current);
+          saveTimerRef.current = null;
+        }
+      };
+    }, [noteId]);
+
+    const handleInput = useCallback(() => {
+      saveSoon();
+    }, [saveSoon]);
+
+    const exec = useCallback(
+      (cmd: string, value?: string) => {
         const el = ref.current;
         if (!el) return;
-        el.focus();
-        const offset = getCaretOffset(el);
-        const text = el.textContent ?? "";
-        const { lineStart, line, bulletIndent } = getLineInfo(text, offset);
+        if (document.activeElement !== el) el.focus();
+        // execCommand is deprecated but remains the most portable way to do
+        // inline formatting inside contentEditable. Chrome / Safari / Firefox
+        // all still support the basic commands (bold, italic, formatBlock,
+        // insertUnorderedList, insertOrderedList).
+        document.execCommand(cmd, false, value);
+        saveSoon();
+      },
+      [saveSoon]
+    );
 
-        if (bulletIndent !== null) {
-          // Remove bullet marker
-          const newText =
-            text.slice(0, lineStart) +
-            text.slice(lineStart).replace(/^( *)• /, "$1");
-          el.textContent = newText;
-          setCaretToOffset(
-            el,
-            Math.max(lineStart, offset - BULLET.length)
-          );
-          saveSoon(newText);
-        } else {
-          // Add bullet at start of line (keep leading indent)
-          const indentMatch = line.match(/^( *)/);
-          const indent = indentMatch ? indentMatch[1] : "";
-          const afterIndent = lineStart + indent.length;
-          const newText =
-            text.slice(0, afterIndent) + BULLET + text.slice(afterIndent);
-          el.textContent = newText;
-          setCaretToOffset(
-            el,
-            Math.max(afterIndent + BULLET.length, offset + BULLET.length)
-          );
-          saveSoon(newText);
+    const setHeading = useCallback(
+      (level: 1 | 2 | 3 | null) => {
+        exec("formatBlock", level === null ? "div" : `h${level}`);
+      },
+      [exec]
+    );
+
+    useImperativeHandle(
+      forwardedRef,
+      () => ({
+        execBold: () => exec("bold"),
+        execItalic: () => exec("italic"),
+        execUnderline: () => exec("underline"),
+        execStrikethrough: () => exec("strikeThrough"),
+        setHeading,
+        toggleBulletAtCaret: () => exec("insertUnorderedList"),
+        toggleNumberedAtCaret: () => exec("insertOrderedList"),
+      }),
+      [exec, setHeading]
+    );
+
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+        const mod = e.metaKey || e.ctrlKey;
+        if (!mod) return;
+        if (e.key === "b" || e.key === "B") {
+          e.preventDefault();
+          exec("bold");
+        } else if (e.key === "i" || e.key === "I") {
+          e.preventDefault();
+          exec("italic");
+        } else if (e.key === "u" || e.key === "U") {
+          e.preventDefault();
+          exec("underline");
         }
       },
-    }),
-    [saveSoon]
-  );
+      [exec]
+    );
 
-  // Fallback prop type: not every browser officially types "plaintext-only".
-  const contentEditableAttr = "plaintext-only" as unknown as boolean;
-
-  return (
-    <div
-      ref={ref}
-      contentEditable={contentEditableAttr}
-      suppressContentEditableWarning
-      className="outline-none leading-relaxed text-foreground whitespace-pre-wrap min-h-[50vh]"
-      onInput={handleInput}
-      onKeyDown={handleKeyDown}
-    />
-  );
-});
+    return (
+      <div
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
+        className="rich-editor outline-none leading-relaxed text-foreground min-h-[50vh]"
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
+      />
+    );
+  }
+);

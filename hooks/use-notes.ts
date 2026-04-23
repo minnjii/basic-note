@@ -73,10 +73,21 @@ export function useNotes(categoryId?: string | null) {
           // first non-empty legacy block for unmigrated notes.
           try {
             if (note.content) {
-              const text = await cachedDecrypt(note.content);
-              if (!looksLikeCiphertext(text)) {
-                // First non-empty line.
-                for (const rawLine of text.split("\n")) {
+              const raw = await cachedDecrypt(note.content);
+              if (!looksLikeCiphertext(raw)) {
+                // Content may be HTML (new model) or plaintext (pre-HTML
+                // notes). Strip tags and grab first non-empty line.
+                let text = raw;
+                if (/<[a-z][^>]*>/i.test(raw)) {
+                  if (typeof document !== "undefined") {
+                    const tpl = document.createElement("template");
+                    tpl.innerHTML = raw;
+                    text = tpl.content.textContent ?? "";
+                  } else {
+                    text = raw.replace(/<[^>]*>/g, " ");
+                  }
+                }
+                for (const rawLine of text.split(/\n|\r/)) {
                   const line = rawLine.replace(/^( *)• /, "$1").trim();
                   if (!line) continue;
                   preview = line.length > 80 ? line.slice(0, 80) + "…" : line;
