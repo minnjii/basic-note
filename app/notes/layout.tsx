@@ -2,7 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { SidebarProvider, SidebarInset } from "@minnjii/dx-kit/ui/sidebar";
+import {
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+} from "@minnjii/dx-kit/ui/sidebar";
 import { TooltipProvider } from "@minnjii/dx-kit/ui/tooltip";
 import { Spinner } from "@minnjii/dx-kit/ui/spinner";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
@@ -44,6 +48,7 @@ export default function NotesLayout({
           <AppSidebar />
           <SidebarInset>
             <header className="flex h-14 shrink-0 items-center gap-2 px-6">
+              <SidebarTrigger className="md:hidden -ml-2" />
               <nav className="flex items-center gap-1 mt-0.5">
                 {VIEW_TABS.map((tab) => {
                   const active = isTabActive(tab.href);
