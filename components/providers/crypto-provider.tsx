@@ -36,7 +36,6 @@ import {
   startAutoSync,
   stopAutoSync,
 } from "@/lib/sync/engine";
-import { migrateAllNotesToContent } from "@/lib/migrations/blocks-to-content";
 
 interface CryptoContextValue {
   isSetup: boolean;
@@ -110,7 +109,6 @@ async function migrateData(
 ) {
   const categories = await db.categories.toArray();
   const notes = await db.notes.toArray();
-  const blocks = await db.blocks.toArray();
 
   // Decrypt with old key; skip items that fail so we don't re-encrypt ciphertext
   const encCats: typeof categories = [];
@@ -129,39 +127,27 @@ async function migrateData(
 
   const encNotes: typeof notes = [];
   for (const n of notes) {
-    if (!n.title) {
-      encNotes.push({ ...n, title: "" });
-      continue;
+    const next = { ...n };
+    if (n.title) {
+      try {
+        next.title = await encrypt(masterKey, await decrypt(oldKey, n.title));
+      } catch {}
     }
-    try {
-      const plain = await decrypt(oldKey, n.title);
-      encNotes.push({ ...n, title: await encrypt(masterKey, plain) });
-    } catch {}
+    if (n.content) {
+      try {
+        next.content = await encrypt(
+          masterKey,
+          await decrypt(oldKey, n.content)
+        );
+      } catch {}
+    }
+    encNotes.push(next);
   }
 
-  const encBlocks: typeof blocks = [];
-  for (const b of blocks) {
-    if (!b.content) {
-      encBlocks.push({ ...b, content: "" });
-      continue;
-    }
-    try {
-      const plain = await decrypt(oldKey, b.content);
-      encBlocks.push({ ...b, content: await encrypt(masterKey, plain) });
-    } catch {}
-  }
-
-  await db.transaction(
-    "rw",
-    db.categories,
-    db.notes,
-    db.blocks,
-    async () => {
-      if (encCats.length) await db.categories.bulkPut(encCats);
-      if (encNotes.length) await db.notes.bulkPut(encNotes);
-      if (encBlocks.length) await db.blocks.bulkPut(encBlocks);
-    }
-  );
+  await db.transaction("rw", db.categories, db.notes, async () => {
+    if (encCats.length) await db.categories.bulkPut(encCats);
+    if (encNotes.length) await db.notes.bulkPut(encNotes);
+  });
 }
 
 export function CryptoProvider({ children }: { children: ReactNode }) {
@@ -334,17 +320,6 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
   }, [cryptoKey, resetIdleTimer]);
-
-  // One-shot sweep: migrate any un-migrated notes from the legacy block table
-  // into note.content. The migration module guards re-runs with a localStorage
-  // flag, so this is cheap to call on every unlock.
-  useEffect(() => {
-    if (!cryptoKey) return;
-    void migrateAllNotesToContent(
-      (plain) => encrypt(cryptoKey, plain),
-      (enc) => decrypt(cryptoKey, enc)
-    );
-  }, [cryptoKey]);
 
   // ── Setup (first time) ─────────────────────────────────────
   const setup = useCallback(async (password: string) => {

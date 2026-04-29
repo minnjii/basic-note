@@ -13,10 +13,20 @@ import { useCrypto } from "@/components/providers/crypto-provider";
 import { syncPushEntity } from "@/lib/sync/engine";
 import { looksLikeCiphertext } from "@/lib/crypto";
 import { isLockError } from "@/lib/decrypt-diagnostics";
-import {
-  migrateNoteFromBlocks,
-  plaintextToHtml,
-} from "@/lib/migrations/blocks-to-content";
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Convert legacy plaintext (newline-separated) to HTML <div> lines.
+// Used when an older note.content was saved as plaintext rather than HTML.
+function plaintextToHtml(text: string): string {
+  if (!text) return "";
+  return text
+    .split("\n")
+    .map((line) => `<div>${line ? escapeHtml(line) : "<br>"}</div>`)
+    .join("");
+}
 
 /**
  * Apple Notes-style editor. Single HTML contentEditable with inline format
@@ -87,19 +97,6 @@ export const PlainEditor = forwardRef<PlainEditorHandle, PlainEditorProps>(
           } catch (e) {
             if (!isLockError(e)) html = "";
           }
-        } else {
-          html = await migrateNoteFromBlocks(noteId, decryptText);
-          if (html) {
-            try {
-              const encrypted = await encryptText(html);
-              await db.notes.update(noteId, {
-                content: encrypted,
-                updatedAt: Date.now(),
-              });
-              const updated = await db.notes.get(noteId);
-              if (updated) syncPushEntity("note", updated);
-            } catch {}
-          }
         }
         if (cancelled || !ref.current) return;
         if (ref.current.innerHTML !== html) {
@@ -110,7 +107,7 @@ export const PlainEditor = forwardRef<PlainEditorHandle, PlainEditorProps>(
       return () => {
         cancelled = true;
       };
-    }, [noteId, isUnlocked, note, decryptText, encryptText]);
+    }, [noteId, isUnlocked, note, decryptText]);
 
     // Flush pending save when note changes / unmount.
     useEffect(() => {

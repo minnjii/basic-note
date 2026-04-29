@@ -59,12 +59,10 @@ export async function resetEverything() {
     "rw",
     db.categories,
     db.notes,
-    db.blocks,
     db.settings,
     async () => {
       await db.categories.clear();
       await db.notes.clear();
-      await db.blocks.clear();
       await db.settings.clear();
     }
   );

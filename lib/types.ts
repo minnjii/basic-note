@@ -1,20 +1,3 @@
-// ─── Block Types ─────────────────────────────────────────────
-export type BlockType =
-  | "text"
-  | "heading"
-  | "bullet"
-  | "numbered"
-  | "todo"
-  | "divider"
-  | "quote"
-  | "code";
-
-export interface BlockMeta {
-  level?: 1 | 2 | 3; // heading
-  checked?: boolean; // todo
-  language?: string; // code
-}
-
 // ─── Core Entities ───────────────────────────────────────────
 export interface Category {
   id: string;
@@ -34,19 +17,6 @@ export interface Note {
   title: string; // encrypted
   content?: string; // encrypted plaintext body (new single-editable model)
   pinned: boolean;
-  createdAt: number;
-  updatedAt: number;
-  deletedAt: number | null;
-}
-
-export interface Block {
-  id: string;
-  noteId: string;
-  type: BlockType;
-  content: string; // encrypted
-  indent: number;
-  sortOrder: string; // fractional index
-  meta: BlockMeta;
   createdAt: number;
   updatedAt: number;
   deletedAt: number | null;
