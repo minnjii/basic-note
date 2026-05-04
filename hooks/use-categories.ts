@@ -9,6 +9,40 @@ import { useLiveQuery } from "dexie-react-hooks";
 // the category title flashes the "카테고리" placeholder before the async
 // decrypt resolves. Cleared when any consumer observes isUnlocked=false.
 let decryptedCategoriesCache: Category[] | undefined = undefined;
+
+// sessionStorage hot cache. Persists decrypted category names across full-page
+// reloads (module cache is wiped on reload). Plain text labels are exposed to
+// any same-origin script — note bodies remain ciphertext. Invalidated on lock.
+const SS_KEY = "bn_categories_decrypted_v1";
+
+function readCategoriesCache(): Category[] | undefined {
+  if (typeof sessionStorage === "undefined") return undefined;
+  try {
+    const raw = sessionStorage.getItem(SS_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed as Category[];
+  } catch {
+    // ignore corrupt cache
+  }
+  return undefined;
+}
+
+function writeCategoriesCache(cats: Category[]) {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.setItem(SS_KEY, JSON.stringify(cats));
+  } catch {
+    // storage full or disabled — silent
+  }
+}
+
+function clearCategoriesCache() {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.removeItem(SS_KEY);
+  } catch {}
+}
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
 import { useCrypto } from "@/components/providers/crypto-provider";
@@ -61,13 +95,14 @@ export function useCategories() {
   // (e.g. after navigation) gets the previous decrypted list immediately.
   const [decryptedCategories, setDecryptedCategories] = useState<
     Category[] | undefined
-  >(decryptedCategoriesCache);
+  >(() => decryptedCategoriesCache ?? readCategoriesCache());
 
   // Invalidate the cache when the app locks. Done in a separate effect so
   // unlock cycles always start from a clean slate (different cryptoKey).
   useEffect(() => {
     if (!isUnlocked) {
       decryptedCategoriesCache = undefined;
+      clearCategoriesCache();
     }
   }, [isUnlocked]);
 
@@ -94,6 +129,7 @@ export function useCategories() {
       );
       if (!cancelled) {
         decryptedCategoriesCache = result;
+        writeCategoriesCache(result);
         setDecryptedCategories(result);
       }
     })();

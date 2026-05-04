@@ -13,7 +13,10 @@ export default function CategoryNotesPage({
   const { categories } = useCategories();
 
   const category = categories.find((c) => c.id === categoryId);
-  const title = category ? category.name : "카테고리";
+  // Empty fallback (not "카테고리") so the title doesn't flash a placeholder
+  // word before async decrypt resolves. NoteList renders the empty title slot
+  // gracefully and the real name fades in on the next render.
+  const title = category ? category.name : "";
 
   return (
     <NoteList

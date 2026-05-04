@@ -24,6 +24,7 @@ import { Plus, FileText, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes } from "@/hooks/use-notes";
 import { useCategories } from "@/hooks/use-categories";
+import { useNotesCount } from "@/components/providers/notes-count-provider";
 import { useLoadingIndicator } from "@/components/providers/global-loading";
 import { useLanguage } from "@/components/providers/language-provider";
 import { CategoryDialog } from "@/components/dialogs/category-dialog";
@@ -41,6 +42,7 @@ export function NoteList({
   const { t } = useLanguage();
   const displayTitle = title ?? t("nav.allNotes");
   const { notes, isLoading, createNote } = useNotes(categoryId);
+  const headerCount = useNotesCount(categoryId);
   const { updateCategory, deleteCategoryWithNotes } = useCategories();
   useLoadingIndicator(`note-list:${categoryId ?? "all"}`, isLoading);
   const router = useRouter();
@@ -72,8 +74,8 @@ export function NoteList({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
             {displayTitle}
-            {!isLoading && (
-              <span className="text-[22px]"> ({notes.length})</span>
+            {headerCount !== undefined && (
+              <span className="text-[22px]"> ({headerCount})</span>
             )}
           </h1>
         </div>
