@@ -344,22 +344,46 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
 
       if (settings.encryptedMasterKey) {
         // New schema: unwrap master key
-        const masterKey = await verifyAndUnwrapMasterKey(
+        let activeWrapper: string = settings.encryptedMasterKey;
+        let masterKey = await verifyAndUnwrapMasterKey(
           password,
           settings.encryptionSalt,
           settings.encryptionVerifier,
-          settings.encryptedMasterKey
+          activeWrapper
         );
+
+        // Verification miss can mean either "wrong password" or "this device
+        // is holding stale settings after a password change on another
+        // device." Pull the latest settings from Supabase and retry once
+        // before declaring the password wrong.
+        if (!masterKey) {
+          const remote = await syncPullSettings().catch(() => null);
+          if (
+            remote &&
+            remote.encryptedMasterKey &&
+            remote.encryptedMasterKey !== activeWrapper
+          ) {
+            await db.settings.put(remote);
+            activeWrapper = remote.encryptedMasterKey;
+            masterKey = await verifyAndUnwrapMasterKey(
+              password,
+              remote.encryptionSalt,
+              remote.encryptionVerifier,
+              remote.encryptedMasterKey
+            );
+          }
+        }
         if (!masterKey) return false;
+
         setCryptoKey(masterKey);
-        loadedWrapperRef.current = settings.encryptedMasterKey;
+        loadedWrapperRef.current = activeWrapper;
         saveSession(password);
         syncPush().then(() => syncPull());
         startAutoSync();
         try {
           bcRef.current?.postMessage({
             type: "unlock",
-            wrapper: settings.encryptedMasterKey,
+            wrapper: activeWrapper,
           } satisfies CryptoBroadcastMessage);
         } catch {}
         return true;

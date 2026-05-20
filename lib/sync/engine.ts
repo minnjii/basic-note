@@ -281,6 +281,26 @@ async function handleRealtimeChange(payload: {
   }
 }
 
+// Mirror remote app_settings changes into IDB. Used so a password change on
+// one device propagates to others: the receiving end picks it up via the
+// crypto-provider live query and triggers a re-key / re-unlock as needed.
+async function handleSettingsChange(payload: {
+  eventType: string;
+  new: Record<string, unknown>;
+}) {
+  const row = payload.new as { id?: string; data?: string; updated_at?: number };
+  if (!row || !row.data) return;
+  try {
+    const remote = JSON.parse(row.data) as AppSettings;
+    const local = await db.settings.get("settings");
+    if (!local || local.updatedAt < remote.updatedAt) {
+      await db.settings.put(remote);
+    }
+  } catch (e) {
+    console.error("[sync] realtime settings apply failed:", e);
+  }
+}
+
 // ─── Auto Sync ───────────────────────────────────────────────
 
 export function startAutoSync() {
@@ -302,6 +322,16 @@ export function startAutoSync() {
       "postgres_changes",
       { event: "UPDATE", schema: "public", table: "encrypted_entities" },
       handleRealtimeChange
+    )
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "app_settings" },
+      handleSettingsChange
+    )
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "app_settings" },
+      handleSettingsChange
     )
     .subscribe();
 
