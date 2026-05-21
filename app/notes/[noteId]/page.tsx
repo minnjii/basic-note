@@ -56,6 +56,7 @@ export default function NoteEditorPage({
   const [title, setTitle] = useState("");
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<PlainEditorHandle>(null);
+  const [headingLevel, setHeadingLevel] = useState<1 | 2 | 3 | null>(null);
 
   const note = useLiveQuery(() => db.notes.get(noteId), [noteId]);
 
@@ -110,25 +111,43 @@ export default function NoteEditorPage({
         {/* Center: formatting toolbar. Absolute center so neighbor widths
             don't push it off balance. */}
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0">
-          <DropdownMenu>
+          <DropdownMenu
+            onOpenChange={(open) => {
+              if (open) {
+                editorRef.current?.saveSelection();
+                setHeadingLevel(editorRef.current?.getHeadingLevel() ?? null);
+              }
+            }}
+          >
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="text-foreground h-8 w-8 p-0" aria-label="사이즈">
                 <Type className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="min-w-[140px]">
-              <DropdownMenuItem onClick={() => editorRef.current?.setHeading(1)}>
-                <Heading1 className="h-4 w-4" /> 제목 1
+            <DropdownMenuContent
+              align="center"
+              className="min-w-[140px]"
+              onCloseAutoFocus={(e) => {
+                e.preventDefault();
+                editorRef.current?.restoreSelection();
+              }}
+            >
+              <DropdownMenuItem className="justify-between" onClick={() => { editorRef.current?.restoreSelection(); editorRef.current?.setHeading(1); }}>
+                <span className="flex items-center gap-2"><Heading1 className="h-4 w-4" /> 제목 1</span>
+                {headingLevel === 1 && <Check className="h-4 w-4" />}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => editorRef.current?.setHeading(2)}>
-                <Heading2 className="h-4 w-4" /> 제목 2
+              <DropdownMenuItem className="justify-between" onClick={() => { editorRef.current?.restoreSelection(); editorRef.current?.setHeading(2); }}>
+                <span className="flex items-center gap-2"><Heading2 className="h-4 w-4" /> 제목 2</span>
+                {headingLevel === 2 && <Check className="h-4 w-4" />}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => editorRef.current?.setHeading(3)}>
-                <Heading3 className="h-4 w-4" /> 제목 3
+              <DropdownMenuItem className="justify-between" onClick={() => { editorRef.current?.restoreSelection(); editorRef.current?.setHeading(3); }}>
+                <span className="flex items-center gap-2"><Heading3 className="h-4 w-4" /> 제목 3</span>
+                {headingLevel === 3 && <Check className="h-4 w-4" />}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => editorRef.current?.setHeading(null)}>
-                <Type className="h-4 w-4" /> 본문
+              <DropdownMenuItem className="justify-between" onClick={() => { editorRef.current?.restoreSelection(); editorRef.current?.setHeading(null); }}>
+                <span className="flex items-center gap-2"><Type className="h-4 w-4" /> 본문</span>
+                {headingLevel === null && <Check className="h-4 w-4" />}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

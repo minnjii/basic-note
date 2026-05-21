@@ -94,6 +94,12 @@ export interface PlainEditorHandle {
   execStrikethrough: () => void;
   /** Set block element type for current line. null → body paragraph (div). */
   setHeading: (level: 1 | 2 | 3 | null) => void;
+  /** Heading level of the block under the caret (null = body). */
+  getHeadingLevel: () => 1 | 2 | 3 | null;
+  /** Snapshot the current selection so it can be restored after focus loss. */
+  saveSelection: () => void;
+  /** Refocus the editor and re-apply the last snapshotted selection. */
+  restoreSelection: () => void;
   toggleBulletAtCaret: () => void;
   toggleNumberedAtCaret: () => void;
   /** Wrap selection (or insert) with `<a href>`. Empty url → unlink. */
@@ -276,6 +282,54 @@ export const PlainEditor = forwardRef<PlainEditorHandle, PlainEditorProps>(
       [exec, saveSoon]
     );
 
+    const getHeadingLevel = useCallback((): 1 | 2 | 3 | null => {
+      const el = ref.current;
+      if (!el) return null;
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return null;
+      let node: Node | null = sel.getRangeAt(0).startContainer;
+      if (!node || !el.contains(node)) return null;
+      if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+      let block: Element | null = node as Element | null;
+      const BLOCK_RE = /^(H[1-6]|P|DIV|LI)$/;
+      while (block && block !== el && !BLOCK_RE.test(block.tagName)) {
+        block = block.parentElement;
+      }
+      if (!block) return null;
+      let target: Element = block;
+      if (block.tagName === "LI") {
+        const heading = block.querySelector("h1,h2,h3,h4,h5,h6");
+        if (heading && heading.parentElement === block) target = heading;
+      }
+      const m = target.tagName.match(/^H([1-6])$/);
+      if (!m) return null;
+      const lv = Number.parseInt(m[1], 10);
+      return lv === 1 || lv === 2 || lv === 3 ? (lv as 1 | 2 | 3) : null;
+    }, []);
+
+    const savedRangeRef = useRef<Range | null>(null);
+
+    const saveSelection = useCallback(() => {
+      const el = ref.current;
+      if (!el) return;
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      if (!el.contains(range.startContainer)) return;
+      savedRangeRef.current = range.cloneRange();
+    }, []);
+
+    const restoreSelection = useCallback(() => {
+      const el = ref.current;
+      const range = savedRangeRef.current;
+      if (!el || !range) return;
+      el.focus();
+      const sel = window.getSelection();
+      if (!sel) return;
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }, []);
+
     // Apply target=_blank + rel=noopener to all anchors inside the editor.
     // Run after createLink/auto-link to harden against tab-nabbing.
     const hardenAnchors = useCallback(() => {
@@ -420,6 +474,9 @@ export const PlainEditor = forwardRef<PlainEditorHandle, PlainEditorProps>(
         execUnderline: () => exec("underline"),
         execStrikethrough: () => exec("strikeThrough"),
         setHeading,
+        getHeadingLevel,
+        saveSelection,
+        restoreSelection,
         toggleBulletAtCaret: () => exec("insertUnorderedList"),
         toggleNumberedAtCaret: () => exec("insertOrderedList"),
         createLink,
@@ -427,7 +484,7 @@ export const PlainEditor = forwardRef<PlainEditorHandle, PlainEditorProps>(
         isLinkAtCaret,
         toggleHighlight,
       }),
-      [exec, setHeading, createLink, unlinkAtCaret, isLinkAtCaret, toggleHighlight]
+      [exec, setHeading, getHeadingLevel, saveSelection, restoreSelection, createLink, unlinkAtCaret, isLinkAtCaret, toggleHighlight]
     );
 
     const handleKeyDown = useCallback(
