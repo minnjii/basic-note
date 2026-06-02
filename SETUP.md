@@ -1,12 +1,6 @@
-<div align="center">
-
 # 📝 basic note — 설치 가이드
 
 **본인의 Vercel + Supabase 계정에 설치하여, 데이터를 직접 소유하고 운용하는 셀프호스팅 노트 앱**
-
-운영자 없이 각자 자기 서버에서 동작합니다.
-
-</div>
 
 ---
 
@@ -104,11 +98,7 @@
 
 아래 버튼을 누르면 이 저장소가 본인 GitHub로 복제되고, 배포 과정에서 환경변수 입력 화면이 나옵니다.
 
-<div align="center">
-
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fplusxdev%2Fbasic-note&env=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY&envDescription=Supabase%20%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%EC%9D%98%20URL%EA%B3%BC%20anon%20key&envLink=https%3A%2F%2Fgithub.com%2Fplusxdev%2Fbasic-note%2Fblob%2Fmain%2FSETUP.md&project-name=basic-note&repository-name=basic-note)
-
-</div>
 
 배포 마법사에서:
 
@@ -137,11 +127,7 @@
 > 🔑 **복구 키를 반드시 안전한 곳에 백업하세요.**
 > 비밀번호를 잊으면 복구 키 없이는 데이터를 절대 되살릴 수 없습니다 (서버에도 평문이 없습니다).
 
-<div align="center">
-
 **🎉 검증 완료 — 이제 본인 데이터로 동작하는 basic note가 준비됐습니다.**
-
-</div>
 
 ---
 
@@ -158,6 +144,4 @@
 > [!TIP]
 > 문제가 계속되면 Supabase **Logs**와 브라우저 **DevTools 콘솔**을 함께 확인하세요.
 
-<div align="center">
 <sub>© 2026 PlusX basic note</sub>
-</div>
