@@ -22,3 +22,10 @@ npm-debug.log*
 # misc
 .DS_Store
 *.tgz
+*.tsbuildinfo
+
+# dev-only docs (operating protocol / design system / session history)
+AGENTS.md
+CLAUDE.md
+CLAUDE_HISTORY.md
+DESIGN_SYSTEM.md
