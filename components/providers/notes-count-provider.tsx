@@ -108,9 +108,10 @@ export function NotesCountProvider({
 
 export function useNotesCount(categoryId?: string | null): number | undefined {
   const ctx = useContext(NotesCountContext);
-  if (!ctx) {
-    throw new Error("useNotesCount must be used within NotesCountProvider");
-  }
+  // Degrade gracefully when rendered outside a provider (e.g. the shared
+  // AppSidebar on a layout that forgot the provider): return undefined rather
+  // than throwing, so a missing count never white-screens the whole page.
+  if (!ctx) return undefined;
   if (categoryId === undefined) return ctx.total;
   if (categoryId === null) return ctx.uncategorized;
   if (!ctx.byCategory) return undefined;
