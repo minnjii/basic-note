@@ -135,20 +135,20 @@ export function NoteEditor({ noteId }: { noteId: string }) {
                 editorRef.current?.restoreSelection();
               }}
             >
-              <DropdownMenuItem className="justify-between" onClick={() => { editorRef.current?.restoreSelection(); editorRef.current?.setHeading(1); }}>
+              <DropdownMenuItem className="justify-between" onClick={() => { editorRef.current?.setHeading(1); }}>
                 <span className="flex items-center gap-2"><Heading1 className="h-4 w-4" /> 제목 1</span>
                 {headingLevel === 1 && <Check className="h-4 w-4" />}
               </DropdownMenuItem>
-              <DropdownMenuItem className="justify-between" onClick={() => { editorRef.current?.restoreSelection(); editorRef.current?.setHeading(2); }}>
+              <DropdownMenuItem className="justify-between" onClick={() => { editorRef.current?.setHeading(2); }}>
                 <span className="flex items-center gap-2"><Heading2 className="h-4 w-4" /> 제목 2</span>
                 {headingLevel === 2 && <Check className="h-4 w-4" />}
               </DropdownMenuItem>
-              <DropdownMenuItem className="justify-between" onClick={() => { editorRef.current?.restoreSelection(); editorRef.current?.setHeading(3); }}>
+              <DropdownMenuItem className="justify-between" onClick={() => { editorRef.current?.setHeading(3); }}>
                 <span className="flex items-center gap-2"><Heading3 className="h-4 w-4" /> 제목 3</span>
                 {headingLevel === 3 && <Check className="h-4 w-4" />}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="justify-between" onClick={() => { editorRef.current?.restoreSelection(); editorRef.current?.setHeading(null); }}>
+              <DropdownMenuItem className="justify-between" onClick={() => { editorRef.current?.setHeading(null); }}>
                 <span className="flex items-center gap-2"><Type className="h-4 w-4" /> 본문</span>
                 {headingLevel === null && <Check className="h-4 w-4" />}
               </DropdownMenuItem>

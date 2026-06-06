@@ -67,6 +67,18 @@ function unwrapElement(el: Element) {
   parent.removeChild(el);
 }
 
+// Collapse the caret to the end of `el`. Best-effort: if the mobile browser
+// drops the programmatic selection the block swap still took effect visually.
+function placeCaretAtEnd(el: Element) {
+  const sel = window.getSelection();
+  if (!sel) return;
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  r.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
 // Convert legacy plaintext (newline-separated) to HTML <div> lines.
 // Used when an older note.content was saved as plaintext rather than HTML.
 function plaintextToHtml(text: string): string {
@@ -230,26 +242,37 @@ export const PlainEditor = forwardRef<PlainEditorHandle, PlainEditorProps>(
       (level: 1 | 2 | 3 | null) => {
         const el = ref.current;
         if (!el) return;
-        if (document.activeElement !== el) el.focus();
 
+        // Resolve the target range. On mobile the live selection is usually
+        // gone by the time the dropdown item fires (the tap blurred the
+        // editor), so prefer the snapshot taken on the trigger's pointerdown.
+        let range = savedRangeRef.current;
         const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0) {
-          exec("formatBlock", level === null ? "div" : `h${level}`);
-          return;
+        if (!range || !el.contains(range.startContainer)) {
+          if (
+            sel &&
+            sel.rangeCount > 0 &&
+            el.contains(sel.getRangeAt(0).startContainer)
+          ) {
+            range = sel.getRangeAt(0);
+          }
         }
+        if (!range || !el.contains(range.startContainer)) return;
 
         // 캐럿이 위치한 가장 가까운 block (LI 포함)을 찾는다.
-        let node: Node | null = sel.getRangeAt(0).startContainer;
+        let node: Node | null = range.startContainer;
         if (node && node.nodeType === Node.TEXT_NODE) node = node.parentElement;
         let block: Element | null = node as Element | null;
         const BLOCK_RE = /^(H[1-6]|P|DIV|LI)$/;
         while (block && block !== el && !BLOCK_RE.test(block.tagName)) {
           block = block.parentElement;
         }
+        if (!block || block === el) return;
 
-        // LI 안: execCommand("formatBlock")이 li 자식 헤딩을 풀어주지 못한다.
-        // 헤딩 wrap 자체를 DOM 조작으로 교체/제거하고, 블릿(LI)은 유지한다.
-        if (block && block.tagName === "LI") {
+        const tag = level === null ? "div" : `h${level}`;
+
+        // LI 안: li 자식 헤딩 wrap을 DOM 조작으로 교체/제거하고, 블릿(LI)은 유지.
+        if (block.tagName === "LI") {
           const heading = block.querySelector("h1,h2,h3,h4,h5,h6");
           const inLi = heading && heading.parentElement === block;
           if (level === null) {
@@ -258,36 +281,46 @@ export const PlainEditor = forwardRef<PlainEditorHandle, PlainEditorProps>(
               while (heading!.firstChild) frag.appendChild(heading!.firstChild);
               heading!.replaceWith(frag);
             }
+          } else if (inLi) {
+            const newH = document.createElement(tag);
+            newH.innerHTML = heading!.innerHTML;
+            heading!.replaceWith(newH);
+            placeCaretAtEnd(newH);
           } else {
-            const newH = document.createElement(`h${level}`);
-            if (inLi) {
-              newH.innerHTML = heading!.innerHTML;
-              heading!.replaceWith(newH);
-            } else {
-              while (block.firstChild) newH.appendChild(block.firstChild);
-              block.appendChild(newH);
-            }
-            const r = document.createRange();
-            r.selectNodeContents(newH);
-            r.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(r);
+            const newH = document.createElement(tag);
+            while (block.firstChild) newH.appendChild(block.firstChild);
+            block.appendChild(newH);
+            placeCaretAtEnd(newH);
           }
+          savedRangeRef.current = null;
           saveSoon();
           return;
         }
 
-        exec("formatBlock", level === null ? "div" : `h${level}`);
+        // 일반 block(div/p/h*): 요소를 새 태그로 통째 교체하고 자식은 보존.
+        // execCommand("formatBlock") + 선택복원은 모바일에서 불안정하므로
+        // DOM 직접 교체로 확실하게 적용한다.
+        const newBlock = document.createElement(tag);
+        while (block.firstChild) newBlock.appendChild(block.firstChild);
+        if (!newBlock.firstChild) newBlock.appendChild(document.createElement("br"));
+        block.replaceWith(newBlock);
+        placeCaretAtEnd(newBlock);
+        savedRangeRef.current = null;
+        saveSoon();
       },
-      [exec, saveSoon]
+      [saveSoon]
     );
 
     const getHeadingLevel = useCallback((): 1 | 2 | 3 | null => {
       const el = ref.current;
       if (!el) return null;
+      let range = savedRangeRef.current;
       const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) return null;
-      let node: Node | null = sel.getRangeAt(0).startContainer;
+      if (!range || !el.contains(range.startContainer)) {
+        if (sel && sel.rangeCount > 0) range = sel.getRangeAt(0);
+      }
+      if (!range) return null;
+      let node: Node | null = range.startContainer;
       if (!node || !el.contains(node)) return null;
       if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
       let block: Element | null = node as Element | null;
