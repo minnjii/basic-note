@@ -99,10 +99,14 @@
 > [!IMPORTANT]
 > **꼭 "Fork"로 설치하세요.** 단순 복제가 아니라 Fork로 깔아야 이후 **자동 업데이트**(원본의 새 버전이 자동으로 흘러들어옴)가 동작합니다. (4단계 참고)
 
-### 2-1. 저장소 Fork
+### 2-1. GitHub에서 코드 복제(Fork)
 
-1. 이 저장소 우측 상단 **Fork** 클릭 → 본인 계정으로 Fork 생성
-2. (기본값 그대로 두면 됩니다)
+> 여기서부터는 **방금까지 보던 Supabase가 아니라 [GitHub](https://github.com)** 라는 다른 사이트입니다. GitHub은 앱의 *코드*가 보관된 곳이고, "저장소(repository)"는 그 코드가 담긴 폴더라고 보면 됩니다. "Fork"는 그 폴더를 **내 GitHub 계정으로 복사**해 오는 것입니다.
+
+1. (GitHub 계정이 없으면) [github.com](https://github.com)에서 무료 가입 후 로그인
+2. 아래 링크를 누르면 복사(Fork) 화면이 열립니다 →  **[basic note 저장소 Fork하기](https://github.com/plusxdev/basic-note/fork)**
+3. 나오는 화면에서 **다른 건 그대로 두고** 아래 초록색 **`Create fork`** 버튼만 클릭
+4. 잠시 뒤 주소창이 `github.com/<본인아이디>/basic-note` 로 바뀌면 = 내 계정으로 복사 완료
 
 ### 2-2. Vercel에 배포
 
