@@ -2,9 +2,16 @@
 # Keeps an installer's fork automatically synced with this upstream repo so
 # code updates flow to their Vercel deployment without manual work.
 #
-# hardreset = the fork's main is reset to exactly match upstream main (pristine
-# mirror, no drift, no merge conflicts). Installers should NOT commit changes to
-# their fork's code — configuration lives in Vercel env vars, not the repo.
+# mergeMethod: merge (NOT hardreset) — on purpose.
+# hardreset makes the fork's main an exact byte-for-byte mirror of upstream, so
+# main ends up pointing at the SAME commit SHA that Vercel already built as a PR
+# *Preview*. Vercel dedups by SHA and then SKIPS the Production deploy, leaving
+# the fork's live site stuck on the previous release. `merge` creates a fresh
+# merge commit (a brand-new SHA Vercel has never seen) → Vercel always builds it
+# as Production → updates reach the live site automatically.
+# Trade-off: merge can stall on a conflict if an installer edits their fork's
+# code. Installers must NOT commit code changes — configuration lives in Vercel
+# env vars, not the repo. With no local edits, merges are always clean.
 #
 # Setup (one-time, by the installer): install the Pull app on the fork at
 # https://github.com/apps/pull — this file then drives the auto-sync.
@@ -12,5 +19,5 @@ version: "1"
 rules:
   - base: main
     upstream: plusxdev:main
-    mergeMethod: hardreset
+    mergeMethod: merge
     mergeUnstable: true
