@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Spinner } from "@plus-experience/design-system/ui/spinner";
 import { Button } from "@plus-experience/design-system/ui/button";
 import { useLanguage } from "@/components/providers/language-provider";
@@ -30,6 +31,10 @@ async function fetchServerVersion(): Promise<string | null> {
 
 export function UpdateGate() {
   const { t } = useLanguage();
+  const pathname = usePathname();
+  // The /admin dashboard inspects deploy versions itself; an auto-reload here
+  // would fight that. Skip the whole update flow on /admin.
+  const isAdmin = pathname?.startsWith("/admin") ?? false;
   const [updating, setUpdating] = useState(false);
   const [bannerVersion, setBannerVersion] = useState<string | null>(null);
   const checkedInitial = useRef(false);
@@ -78,6 +83,7 @@ export function UpdateGate() {
   // Initial entry: if this bundle is behind the live deploy, auto-apply with a
   // full-screen "updating" screen.
   useEffect(() => {
+    if (isAdmin) return;
     if (APP_VERSION === "dev") return;
     if (checkedInitial.current) return;
     checkedInitial.current = true;
@@ -101,11 +107,12 @@ export function UpdateGate() {
         setBannerVersion(serverVersion);
       }
     })();
-  }, [applyUpdate, hardReset]);
+  }, [applyUpdate, hardReset, isAdmin]);
 
   // Re-check when the app regains focus (PWA kept open across a deploy).
   // Mid-use we show a non-intrusive banner rather than reloading abruptly.
   useEffect(() => {
+    if (isAdmin) return;
     if (APP_VERSION === "dev") return;
     const onVisible = async () => {
       if (document.visibilityState !== "visible") return;
@@ -117,7 +124,9 @@ export function UpdateGate() {
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [updating, bannerVersion]);
+  }, [updating, bannerVersion, isAdmin]);
+
+  if (isAdmin) return null;
 
   if (updating) {
     return (

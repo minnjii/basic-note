@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { useCrypto } from "./crypto-provider";
 import { useLanguage } from "@/components/providers/language-provider";
 import { LockScreen } from "@/components/lock-screen";
@@ -74,6 +75,19 @@ function RecoveryKeyDialog() {
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const { isLoading, isSetup, isUnlocked } = useCrypto();
+  const pathname = usePathname();
+
+  // The origin-only /admin dashboard has its own password gate and must not be
+  // blocked by the note app's lock screen. (On installer forks /admin renders
+  // its own "disabled" state — no data — so bypassing the lock is safe.)
+  if (pathname?.startsWith("/admin")) {
+    return (
+      <>
+        {children}
+        <Toaster />
+      </>
+    );
+  }
 
   if (isLoading) {
     return (
