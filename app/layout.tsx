@@ -8,6 +8,7 @@ import { AuthGate } from "@/components/providers/auth-gate";
 import { LanguageProvider } from "@/components/providers/language-provider";
 import { SwRegister } from "@/components/providers/sw-register";
 import { UpdateGate } from "@/components/providers/update-gate";
+import { OfflineReadyToast } from "@/components/providers/offline-ready-toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -64,6 +65,7 @@ export default function RootLayout({
           <DbProvider>
             <LanguageProvider>
               <UpdateGate />
+              <OfflineReadyToast />
               <CryptoProvider>
                 <AuthGate>{children}</AuthGate>
               </CryptoProvider>

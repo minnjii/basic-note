@@ -95,6 +95,19 @@ self.addEventListener("install", (event) => {
           }
         })
       );
+
+      // Tell the app the shell + editor route are fully cached. Until this
+      // fires, going offline is unsafe: in-memory router prefetch covers the
+      // first navigation or two, then a live RSC fetch is needed and there's
+      // no cache to fall back on yet → note entry breaks. The app shows a
+      // one-time "offline ready" toast so first-run users stay online briefly.
+      const windows = await self.clients.matchAll({
+        includeUncontrolled: true,
+        type: "window",
+      });
+      windows.forEach((c) =>
+        c.postMessage({ type: "offline-ready", version: SW_VERSION })
+      );
     })()
   );
   self.skipWaiting();
@@ -131,7 +144,8 @@ self.addEventListener("fetch", (event) => {
   // precached document or RSC payload when offline. The query string (id,
   // _rsc hash) is stripped via a fixed cache key, so any note id resolves.
   if (isShellPath(url.pathname)) {
-    const key = isRscRequest(request, url) ? rscKey(url.pathname) : url.pathname;
+    const isRsc = isRscRequest(request, url);
+    const key = isRsc ? rscKey(url.pathname) : url.pathname;
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -140,9 +154,22 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(async () => {
+          if (isRsc) {
+            // NEVER serve an HTML document to an RSC fetch — that yields a
+            // broken partial render and (for /notes/note) bounces the user back
+            // to the list = "note won't open". On miss, error out so the client
+            // retries as a hard navigation, which the document branch serves.
+            return (
+              (await caches.match(key)) ||
+              (await caches.match(rscKey("/notes/note"))) ||
+              (await caches.match(rscKey("/notes"))) ||
+              Response.error()
+            );
+          }
+          // Document request: prefer the EXACT shell doc (so /notes/note opens
+          // the editor, not the list), then the root shell.
           return (
-            (await caches.match(key)) ||
-            (await caches.match("/notes")) ||
+            (await caches.match(url.pathname)) ||
             (await caches.match("/")) ||
             Response.error()
           );
