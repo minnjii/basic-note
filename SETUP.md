@@ -166,6 +166,22 @@
 >
 > 이 앱은 끄는 게 안전합니다 — 보호 대상인 환경변수 2개가 모두 `NEXT_PUBLIC_` 접두사라 **어차피 브라우저에 공개되는 값**이고(시크릿 아님), 실제 보안은 E2E 암호화 + RLS로 지킵니다.
 
+### 4-1. 라이브 반영 보장 — Deploy Hook 연결 (필수)
+
+위 단계까지만 하면 Vercel이 가끔 동기화 커밋을 **`Preview`로만 배포**하거나 webhook을 놓쳐 **라이브가 옛 버전에 멈춥니다**(그때마다 수동 `Promote` 필요 — 번거롭고 놓치기 쉬움). 아래를 **반드시 연결**하세요. 그러면 **main이 갱신될 때마다 Production 배포가 자동 보장**되어, 이후로는 손댈 일이 없습니다.
+
+1. **Vercel → 본인 프로젝트 → Settings → Git → `Deploy Hooks`**
+   - **Hook Name**: 아무거나 (예: `promote-main`), **Git Branch**: `main` → **Create Hook**
+   - 생성된 **URL을 복사**합니다 (`https://api.vercel.com/v1/integrations/deploy/...`)
+2. **GitHub 본인 Fork → Settings → Secrets and variables → Actions → `New repository secret`**
+   - **Name**: `VERCEL_DEPLOY_HOOK`
+   - **Secret**: 방금 복사한 Hook URL → **Add secret**
+3. **GitHub 본인 Fork → `Actions` 탭** → 안내가 뜨면 **`I understand my workflows, go ahead and enable them`** 클릭 (Fork는 기본적으로 Actions가 꺼져 있음)
+
+> [!NOTE]
+> Hook URL은 그 자체가 키입니다 — **공개하지 마세요**. 다행히 GitHub Secret에 넣으면 로그에도 노출되지 않습니다.
+> Secret을 안 넣으면 워크플로우는 그냥 통과(no-op)할 뿐 에러는 안 납니다. 하지만 그러면 위의 `Preview` 갇힘이 가끔 발생하니 **꼭 설정하세요**.
+
 이게 전부입니다. 이제 업데이트는 이렇게 흐릅니다:
 
 ```
@@ -197,7 +213,7 @@
 | "복호화 실패" 항목이 보임 | 다른 마스터 키로 암호화된 데이터가 섞임. 보통 dev/prod가 같은 Supabase를 공유할 때 발생. 개발용 Supabase를 분리하세요. |
 | 첫 화면에 비밀번호 설정이 아니라 잠금/복구 화면이 뜸 | 해당 Supabase에 이미 다른 비밀번호로 만든 데이터가 있습니다. 그 비밀번호로 unlock하거나, 설정에서 전체 초기화 후 다시 시작하세요. |
 | GitHub Fork는 최신인데 웹 앱이 옛 버전 그대로 / 배포가 `awaiting authorization` | **Git Fork Protection**이 켜져 있어 Pull 봇 동기화 커밋의 배포가 막힌 것. **Settings → Security → `Git Fork Protection` 끄기**(4단계 3번). 이미 막힌 배포는 Vercel **Deployments → Create Deployment → `main`** 으로 한 번 올리거나, 막힌 배포의 **Authorize** 버튼을 누르면 해제됩니다. |
-| Fork·빌드는 최신인데 라이브만 옛 버전 / 최신 배포가 **`Production`**이 아니라 **`Preview`** 로만 떠 있음 | 그 커밋이 본배포로 승격되지 않은 상태. **Vercel → Deployments → 최신 배포 행 우측 `⋯` → `Promote to Production`** 한 번이면 즉시 라이브에 반영됩니다(재빌드 아님). 옛 버전 Fork에서 한 번 나타날 수 있고, 이후 동기화부터는 자동으로 Production에 올라갑니다. |
+| Fork·빌드는 최신인데 라이브만 옛 버전 / 최신 배포가 **`Production`**이 아니라 **`Preview`** 로만 떠 있음 | 그 커밋이 본배포로 승격되지 않은 상태. **Vercel → Deployments → 최신 배포 행 우측 `⋯` → `Promote to Production`** 한 번이면 즉시 라이브에 반영됩니다(재빌드 아님). 옛 버전 Fork에서 한 번 나타날 수 있고, 이후 동기화부터는 자동으로 Production에 올라갑니다. [4-1 Deploy Hook](#4-1-라이브-반영-보장--deploy-hook-연결-필수)을 연결했다면 이 증상은 더 안 생깁니다(필수 단계). |
 | 오프라인에서 노트 진입/생성이 안 됨 (새 배포 직후) | 새 버전 코드를 아직 못 받은 상태. **온라인에서 앱을 한 번 열면** 서비스워커가 새 버전을 받아 캐시하며, 이후 오프라인에서 정상 동작합니다. |
 | 빌드 실패 | Node 18+ 필요. Vercel은 기본 충족. 로컬이면 `node -v` 확인. |
 

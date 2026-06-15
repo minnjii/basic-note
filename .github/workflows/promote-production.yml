@@ -1,0 +1,39 @@
+# 동기화될 때마다 Vercel Production 배포를 보장한다.
+#
+# 왜 필요한가: Pull 봇이 fork의 코드는 항상 최신으로 맞춰주지만(merge),
+# Vercel의 Git 연동은 가끔 main-push webhook을 놓치거나 머지 커밋을
+# Preview로만 배포해 라이브가 옛 버전에 멈추는 일이 있다(불안정성).
+# 이 워크플로우는 main이 갱신될 때마다 Vercel Deploy Hook을 호출해,
+# webhook 도착 여부와 무관하게 Production 배포를 한 번 더 보장한다.
+#
+# 설치자 1회 세팅 (SETUP.md 4단계 참고):
+#   1. fork의 Actions 탭에서 Actions 활성화
+#   2. Vercel → Settings → Git → Deploy Hooks → 브랜치 `main` 대상 1개 생성
+#   3. fork → Settings → Secrets and variables → Actions →
+#      New repository secret: VERCEL_DEPLOY_HOOK = (생성한 Hook URL)
+# Secret이 없으면 잡은 그냥 통과(no-op)하므로, 아직 세팅 안 한 fork도 안전하다.
+
+name: Promote to Production
+
+on:
+  push:
+    branches: [main]
+
+# 연속 동기화가 겹쳐도 Production 트리거는 직렬로. 진행 중 배포를 끊지 않는다.
+concurrency:
+  group: promote-production
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fire Vercel Deploy Hook
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "VERCEL_DEPLOY_HOOK 미설정 — 건너뜀 (SETUP.md 4단계 참고)."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK" > /dev/null && echo "Deploy Hook 호출 완료 → Vercel Production 배포 트리거됨."
