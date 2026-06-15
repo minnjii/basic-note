@@ -197,6 +197,7 @@ const ko = {
   "update.subtitle": "잠시만 기다려 주세요",
   "update.available": "새 버전이 나왔어요",
   "update.refresh": "지금 업데이트",
+  "offline.ready": "오프라인 사용 준비 완료 — 이제 인터넷 없이도 노트를 쓸 수 있어요",
   "settings.version": "버전",
 };
 
@@ -397,6 +398,7 @@ const en: typeof ko = {
   "update.subtitle": "Just a moment",
   "update.available": "A new version is available",
   "update.refresh": "Update now",
+  "offline.ready": "Ready for offline use — you can now write notes without internet",
   "settings.version": "Version",
 };
 

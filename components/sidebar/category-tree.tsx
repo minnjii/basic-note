@@ -38,7 +38,7 @@ function CategoryNode({ node, depth = 0 }: { node: CategoryTreeNode; depth?: num
               <span>{node.name}</span>
             </SidebarMenuButton>
           </CollapsibleTrigger>
-          <SidebarMenuBadge>{node.noteCount}</SidebarMenuBadge>
+          <SidebarMenuBadge className="justify-end">{node.noteCount}</SidebarMenuBadge>
           <CollapsibleContent>
             <SidebarMenuSub>
               {/* Link to this category's notes */}
@@ -82,7 +82,7 @@ function CategoryNode({ node, depth = 0 }: { node: CategoryTreeNode; depth?: num
           <span>{node.name}</span>
         </Link>
       </SidebarMenuButton>
-      <SidebarMenuBadge>{node.noteCount}</SidebarMenuBadge>
+      <SidebarMenuBadge className="justify-end">{node.noteCount}</SidebarMenuBadge>
     </SidebarMenuItem>
   );
 }
@@ -111,7 +111,7 @@ function UncategorizedItem() {
           <span>{t("categories.uncategorized")}</span>
         </Link>
       </SidebarMenuButton>
-      <SidebarMenuBadge>{count}</SidebarMenuBadge>
+      <SidebarMenuBadge className="justify-end">{count}</SidebarMenuBadge>
     </SidebarMenuItem>
   );
 }
