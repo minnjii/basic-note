@@ -16,10 +16,12 @@ export function saveSession(password: string) {
 
 export function loadSession(timeoutMinutes: number): string | null {
   try {
-    if (timeoutMinutes === 0) return null;
     const pw = sessionStorage.getItem(SESSION_PW_KEY);
     const ts = sessionStorage.getItem(SESSION_TS_KEY);
     if (!pw || !ts) return null;
+    // 0 = "사용 안 함"(Never): 자동잠금이 꺼진 상태이므로 세션을 만료시키지
+    // 않는다. (sessionStorage라 탭/브라우저 세션을 닫으면 어차피 사라진다.)
+    if (timeoutMinutes === 0) return pw;
     const elapsed = Date.now() - Number(ts);
     if (elapsed > timeoutMinutes * 60 * 1000) {
       clearSession();
