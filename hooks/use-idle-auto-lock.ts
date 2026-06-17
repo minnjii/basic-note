@@ -35,10 +35,15 @@ export function useIdleAutoLock({
   useEffect(() => {
     if (!enabled) return;
 
+    const minutes = timeoutMinutes ?? DEFAULT_LOCK_TIMEOUT_MINUTES;
+    // 0 = "사용 안 함"(Never): idle 자동잠금을 걸지 않는다. (?? 는 0을
+    // 거르지 못하므로 여기서 명시적으로 차단 — 안 하면 setTimeout(0)으로
+    // 해제 직후 즉시 재잠금되어 "비번 쳐도 안 열림"이 된다.)
+    if (minutes <= 0) return;
+
     const reset = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       touchSessionTimestamp();
-      const minutes = timeoutMinutes ?? DEFAULT_LOCK_TIMEOUT_MINUTES;
       timerRef.current = setTimeout(
         () => onTimeoutRef.current(),
         minutes * 60 * 1000
